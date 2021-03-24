@@ -9,6 +9,8 @@ Created on 10/7/18 8:40 PM
 """
 
 import tensorflow as tf
+from tensorflow.keras.layers import *
+tf.compat.v1.disable_eager_execution()
 import numpy as np
 from scipy.stats import multivariate_normal
 import math
@@ -64,7 +66,6 @@ z_dim = 5  # noise dimension
 mb_size = 500  # mini-batch size
 n_iter = 20000
 
-optimizer = tf.keras.optimizer.RMSPropOptimizer
 
 kernel = "rbf"  # "rbf" or "imq" kernel
 
@@ -272,19 +273,20 @@ def show_plot(sample, method="", is_true_sample=False, it=None, loss=None, mmd=N
 # network
 #tf.compat.v1.reset_default_graph()
 
-initializer = tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution="uniform")
-
 
 mu_tf = tf.convert_to_tensor(value=mu, dtype=tf.float32)
 Sigma_inv_tf = tf.convert_to_tensor(value=Sigma_inv, dtype=tf.float32)
 p_tf = tf.reshape(tf.convert_to_tensor(value=p, dtype=tf.float32), shape=[n_comp, 1])
 
 
-class KSDmodel(Model):
+class KSDmodel:
+    
     def __init__(self):
-        super(MyModel, self).__init__()
-        self.G_scale = tf.constant_initializer(10.)
-        self.G_location = tf.constant_initializer(30.)
+
+        self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=lr)
+
+        self.G_scale = tf.Variable(10 * np.ones(shape = (1, X_dim)))
+        self.G_location = tf.Variable(30 * np.ones(shape = (1, X_dim)))
 
         self.dense1 = Dense(h_dim_g)
         self.dense2 = Dense(h_dim_g)
@@ -296,18 +298,44 @@ class KSDmodel(Model):
         x = self.dense1(x)
         x = self.dense2(x)
         x = self.dense3(x)
-        x = self.mul(x, self.G_scale)
-        x = self.add(x, self.G_location)
+        x = self.mul([x, tf.repeat(self.G_scale, x.shape[0])])
+        x = self.add([x, self.G_location])
 
 #Custom loss fucntion
     def get_loss(self, x):
         x = self.dense1(x)
         x = self.dense2(x)
         x = self.dense3(x)
-        x = self.mul(x, self.G_scale)
-        x = self.add(x, self.G_location)
+        x = self.mul([x, tf.repeat(self.G_scale, x.shape[0], axis = 0)])
+        x = self.add([x, tf.repeat(self.G_location, x.shape[0], axis = 0)])
         return ksd_emp(x)
 
+    # get gradients
+    def get_grad(self, x):
+        with tf.GradientTape() as tape:
+            tape.watch(self.dense1.variables)
+            tape.watch(self.dense2.variables)
+            tape.watch(self.dense3.variables)
+            tape.watch(self.G_scale)
+            tape.watch(self.G_location)
+
+            L = self.get_loss(x)
+            g = tape.gradient(L, [self.G_scale[0],
+                self.G_location[0],
+                self.dense1.variables[0],self.dense1.variables[1],
+                self.dense2.variables[0],self.dense2.variables[1],
+                self.dense3.variables[0],self.dense3.variables[1]])
+        return g
+
+   # perform gradient descent
+    def network_learn(self,x):
+        g = self.get_grad(x)
+        self.optimizer.apply_gradients(zip(g, [
+            self.G_scale[0],
+            self.G_location[0],
+            self.dense1.variables[0],self.dense1.variables[1],
+            self.dense2.variables[0],self.dense2.variables[1],
+            self.dense3.variables[0],self.dense3.variables[1]]))
 
 ########################################################################################################################
 # functions & structures
@@ -320,6 +348,10 @@ def sample_z(m, n, std=10.):
 
 
 model = KSDmodel()
+initialpoints = sample_z(mb_size, z_dim)
+
+for i in range(100):
+    model.network_learn(initialpoints)
 
 #######################################################################################################################
 
