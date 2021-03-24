@@ -1,0 +1,95 @@
+TensorFlow 2.0 Upgrade Script
+-----------------------------
+Converted 1 files
+Detected 8 issues that require attention
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+File: GaussianMixture_KSD.py
+--------------------------------------------------------------------------------
+GaussianMixture_KSD.py:195:7: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+GaussianMixture_KSD.py:196:7: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+GaussianMixture_KSD.py:197:7: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+GaussianMixture_KSD.py:198:7: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+GaussianMixture_KSD.py:199:7: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+GaussianMixture_KSD.py:200:7: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+GaussianMixture_KSD.py:201:10: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+GaussianMixture_KSD.py:202:13: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+================================================================================
+Detailed log follows:
+
+================================================================================
+--------------------------------------------------------------------------------
+Processing file 'GaussianMixture_KSD.py'
+ outputting to 'tf2_GaussianMixture_KSD.py'
+--------------------------------------------------------------------------------
+
+67:12: INFO: Renamed 'tf.train.RMSPropOptimizer' to 'tf.compat.v1.train.RMSPropOptimizer'
+183:0: INFO: Renamed 'tf.reset_default_graph' to 'tf.compat.v1.reset_default_graph'
+185:14: INFO: Changing tf.contrib.layers xavier initializer to a tf.compat.v1.keras.initializers.VarianceScaling and converting arguments.
+
+187:4: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
+188:4: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
+190:8: INFO: Added keywords to args of function 'tf.convert_to_tensor'
+191:15: INFO: Added keywords to args of function 'tf.convert_to_tensor'
+192:18: INFO: Added keywords to args of function 'tf.convert_to_tensor'
+195:7: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+195:7: INFO: Renamed 'tf.get_variable' to 'tf.compat.v1.get_variable'
+196:7: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+196:7: INFO: Renamed 'tf.get_variable' to 'tf.compat.v1.get_variable'
+197:7: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+197:7: INFO: Renamed 'tf.get_variable' to 'tf.compat.v1.get_variable'
+198:7: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+198:7: INFO: Renamed 'tf.get_variable' to 'tf.compat.v1.get_variable'
+199:7: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+199:7: INFO: Renamed 'tf.get_variable' to 'tf.compat.v1.get_variable'
+200:7: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+200:7: INFO: Renamed 'tf.get_variable' to 'tf.compat.v1.get_variable'
+201:10: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+201:10: INFO: Renamed 'tf.get_variable' to 'tf.compat.v1.get_variable'
+201:61: INFO: tf.constant_initializer requires manual check. Initializers no longer have the dtype argument in the constructor or partition_info argument in the __call__ method.
+The calls have been converted to compat.v1 for safety (even though they may already have been correct).
+201:61: INFO: Renamed 'tf.constant_initializer' to 'tf.compat.v1.constant_initializer'
+202:13: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+202:13: INFO: Renamed 'tf.get_variable' to 'tf.compat.v1.get_variable'
+202:67: INFO: tf.constant_initializer requires manual check. Initializers no longer have the dtype argument in the constructor or partition_info argument in the __call__ method.
+The calls have been converted to compat.v1 for safety (even though they may already have been correct).
+202:67: INFO: Renamed 'tf.constant_initializer' to 'tf.compat.v1.constant_initializer'
+218:17: INFO: Renamed 'tf.diag_part' to 'tf.linalg.tensor_diag_part'
+219:40: INFO: Added keywords to args of function 'tf.transpose'
+220:17: INFO: Renamed 'tf.diag_part' to 'tf.linalg.tensor_diag_part'
+221:40: INFO: Added keywords to args of function 'tf.transpose'
+222:17: INFO: Renamed 'tf.diag_part' to 'tf.linalg.tensor_diag_part'
+223:40: INFO: Added keywords to args of function 'tf.transpose'
+224:17: INFO: Renamed 'tf.diag_part' to 'tf.linalg.tensor_diag_part'
+225:40: INFO: Added keywords to args of function 'tf.transpose'
+226:17: INFO: Renamed 'tf.diag_part' to 'tf.linalg.tensor_diag_part'
+227:40: INFO: Added keywords to args of function 'tf.transpose'
+228:17: INFO: Renamed 'tf.diag_part' to 'tf.linalg.tensor_diag_part'
+229:40: INFO: Added keywords to args of function 'tf.transpose'
+230:17: INFO: Renamed 'tf.diag_part' to 'tf.linalg.tensor_diag_part'
+231:40: INFO: Added keywords to args of function 'tf.transpose'
+232:17: INFO: Renamed 'tf.diag_part' to 'tf.linalg.tensor_diag_part'
+233:40: INFO: Added keywords to args of function 'tf.transpose'
+234:24: INFO: Added keywords to args of function 'tf.reduce_logsumexp'
+242:11: INFO: Added keywords to args of function 'tf.gradients'
+256:22: INFO: Added keywords to args of function 'tf.transpose'
+257:21: INFO: Added keywords to args of function 'tf.reduce_sum'
+257:65: INFO: Added keywords to args of function 'tf.shape'
+258:26: INFO: Added keywords to args of function 'tf.shape'
+259:35: INFO: Added keywords to args of function 'tf.transpose'
+263:29: INFO: Added keywords to args of function 'tf.reduce_sum'
+273:22: INFO: Added keywords to args of function 'tf.transpose'
+274:21: INFO: Added keywords to args of function 'tf.reduce_sum'
+274:65: INFO: Added keywords to args of function 'tf.shape'
+275:26: INFO: Added keywords to args of function 'tf.shape'
+276:35: INFO: Added keywords to args of function 'tf.transpose'
+281:64: INFO: Added keywords to args of function 'tf.reduce_sum'
+298:36: INFO: Added keywords to args of function 'tf.transpose'
+299:13: INFO: Renamed 'tf.trace' to 'tf.linalg.trace'
+299:36: INFO: Added keywords to args of function 'tf.transpose'
+300:16: INFO: Added keywords to args of function 'tf.shape'
+303:11: INFO: Added keywords to args of function 'tf.reduce_sum'
+316:7: INFO: Renamed 'tf.Session' to 'tf.compat.v1.Session'
+317:9: INFO: Renamed 'tf.global_variables_initializer' to 'tf.compat.v1.global_variables_initializer'
+--------------------------------------------------------------------------------
+
