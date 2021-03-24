@@ -73,7 +73,7 @@ kernel = "rbf"  # "rbf" or "imq" kernel
 ########################################
 # plot
 
-iter_display = 5000  # display the sample every iter_display iterations
+iter_display = 1000  # display the sample every iter_display iterations
 nsd_x = nsd_y = 8  # number of sd's to be shown on x & y axises
 delta = 0.025  # grid
 
@@ -242,22 +242,15 @@ def log_densities(xs):
 def S_q(xs):
     return tf.gradients(ys=log_densities(xs), xs=xs)[0]
 
+model = tf.keras.models.Sequential([
+tf.keras.layers.Dense(h_dim_g, activation='relu'),
+tf.keras.layers.Dense(X_dim, activation='relu'),
+tf.keras.layers.Lambda(lambda x: x * G_scale),
+tf.keras.layers.Lambda(lambda x: x + G_location)
+])
 
 def generator(z):
-    G_scale = tf.compat.v1.get_variable('g_scale', [1, X_dim], initializer=tf.compat.v1.constant_initializer(10.))
-    G_location = tf.compat.v1.get_variable('g_location', [1, X_dim], initializer=tf.compat.v1.constant_initializer(30.))
-
-    model = tf.keras.models.Sequential([
-    tf.keras.layers.Dense(h_dim_g, activation='relu'),
-    tf.keras.layers.Dense(X_dim, activation='relu'),
-    tf.keras.layers.Lambda(lambda x: x * G_scale)
-    tf.keras.layers.Lambda(lambda x: x + G_location)
-    ])
-    G_h1 = tf.nn.tanh(tf.matmul(z, G_W1) + G_b1)
-    G_h2 = tf.nn.tanh(tf.matmul(G_h1, G_W2) + G_b2)
-    G_h3 = tf.matmul(G_h2, G_W3) + G_b3
-    out = tf.multiply(G_h3, G_scale) + G_location
-    return out
+    return model(z)
 
 
 def rbf_kernel(x, dim=X_dim, h=1.):

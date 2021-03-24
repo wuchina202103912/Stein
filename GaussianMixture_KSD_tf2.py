@@ -85,6 +85,96 @@ den2d = sum([p[i] * multivariate_normal.pdf(np.stack((X_range, Y_range), 2),
                                             mu[i], Sigma[i])
              for i in range(n_comp)])
 
+#####################
+# loss function
+
+
+def log_densities(xs):
+
+    log_den0 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[0], Sigma_inv_tf[0]),
+                                        tf.transpose(a=xs - mu_tf[0]))) / 2 - np.log(Sigma_det[0]) / 2
+    log_den1 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[1], Sigma_inv_tf[1]),
+                                        tf.transpose(a=xs - mu_tf[1]))) / 2 - np.log(Sigma_det[1]) / 2
+    log_den2 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[2], Sigma_inv_tf[2]),
+                                        tf.transpose(a=xs - mu_tf[2]))) / 2 - np.log(Sigma_det[2]) / 2
+    log_den3 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[3], Sigma_inv_tf[3]),
+                                        tf.transpose(a=xs - mu_tf[3]))) / 2 - np.log(Sigma_det[3]) / 2
+    log_den4 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[4], Sigma_inv_tf[4]),
+                                        tf.transpose(a=xs - mu_tf[4]))) / 2 - np.log(Sigma_det[4]) / 2
+    log_den5 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[5], Sigma_inv_tf[5]),
+                                        tf.transpose(a=xs - mu_tf[5]))) / 2 - np.log(Sigma_det[5]) / 2
+    log_den6 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[6], Sigma_inv_tf[6]),
+                                        tf.transpose(a=xs - mu_tf[6]))) / 2 - np.log(Sigma_det[6]) / 2
+    log_den7 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[7], Sigma_inv_tf[7]),
+                                        tf.transpose(a=xs - mu_tf[7]))) / 2 - np.log(Sigma_det[7]) / 2
+    ld = tf.expand_dims(tf.reduce_logsumexp(input_tensor=tf.stack([np.log(p[0]) + log_den0, np.log(p[1]) + log_den1,
+                                                      np.log(p[2]) + log_den2, np.log(p[3]) + log_den3,
+                                                      np.log(p[4]) + log_den4, np.log(p[5]) + log_den5,
+                                                      np.log(p[6]) + log_den6, np.log(p[7]) + log_den7], 0), axis=0), 1)
+    return ld
+
+
+def S_q(xs):
+    return tf.gradients(ys=log_densities(xs), xs=xs)[0]
+
+
+
+def rbf_kernel(x, dim=X_dim, h=1.):
+    # Reference 1: https://github.com/ChunyuanLI/SVGD/blob/master/demo_svgd.ipynb
+    # Reference 2: https://github.com/yc14600/svgd/blob/master/svgd.py
+    XY = tf.matmul(x, tf.transpose(a=x))
+    X2_ = tf.reshape(tf.reduce_sum(input_tensor=tf.square(x), axis=1), shape=[tf.shape(input=x)[0], 1])
+    X2 = tf.tile(X2_, [1, tf.shape(input=x)[0]])
+    pdist = tf.subtract(tf.add(X2, tf.transpose(a=X2)), 2 * XY)  # pairwise distance matrix
+
+    kxy = tf.exp(- pdist / h ** 2 / 2.0)  # kernel matrix
+
+    sum_kxy = tf.expand_dims(tf.reduce_sum(input_tensor=kxy, axis=1), 1)
+    dxkxy = tf.add(-tf.matmul(kxy, x), tf.multiply(x, sum_kxy)) / (h ** 2)  # sum_y dk(x, y)/dx
+
+    dxykxy_tr = tf.multiply((dim * (h**2) - pdist), kxy) / (h**4)  # tr( dk(x, y)/dxdy )
+
+    return kxy, dxkxy, dxykxy_tr
+
+
+def imq_kernel(x, dim=X_dim, beta=-.5, c=1.):
+    # IMQ kernel
+    XY = tf.matmul(x, tf.transpose(a=x))
+    X2_ = tf.reshape(tf.reduce_sum(input_tensor=tf.square(x), axis=1), shape=[tf.shape(input=x)[0], 1])
+    X2 = tf.tile(X2_, [1, tf.shape(input=x)[0]])
+    pdist = tf.subtract(tf.add(X2, tf.transpose(a=X2)), 2 * XY)  # pairwise distance matrix
+
+    kxy = (c + pdist) ** beta
+
+    coeff = 2 * beta * (c + pdist) ** (beta-1)
+    dxkxy = tf.matmul(coeff, x) - tf.multiply(x, tf.expand_dims(tf.reduce_sum(input_tensor=coeff, axis=1), 1))
+
+    dxykxy_tr = tf.multiply((c + pdist) ** (beta - 2),
+                            - 2 * dim * c * beta + (- 4 * beta ** 2 + (4 - 2 * dim) * beta) * pdist)
+
+    return kxy, dxkxy, dxykxy_tr
+
+
+kernels = {"rbf": rbf_kernel,
+           "imq": imq_kernel}
+
+Kernel = kernels[kernel]
+
+
+def ksd_emp(x, dim=X_dim):
+    sq = S_q(x)
+    kxy, dxkxy, dxykxy_tr = Kernel(x, dim)
+    t13 = tf.multiply(tf.matmul(sq, tf.transpose(a=sq)), kxy) + dxykxy_tr
+    t2 = 2 * tf.linalg.trace(tf.matmul(sq, tf.transpose(a=dxkxy)))
+    n = tf.cast(tf.shape(input=x)[0], tf.float32)
+
+    # ksd = (tf.reduce_sum(t13) - tf.trace(t13) + t2) / (n * (n-1))
+    ksd = (tf.reduce_sum(input_tensor=t13) + t2) / (n ** 2)
+
+    return ksd
+
+#########################
+# plot function
 
 def show_plot(sample, method="", is_true_sample=False, it=None, loss=None, mmd=None, title=False,
               fname=None, show_axis=True, show_true=False, show_contour=True, fix_window=True, equal=True,
@@ -191,23 +281,32 @@ p_tf = tf.reshape(tf.convert_to_tensor(value=p, dtype=tf.float32), shape=[n_comp
 
 
 class KSDmodel(Model):
-  def __init__(self):
-    super(MyModel, self).__init__()
-    self.G_scale = tf.constant_initializer(10.)
-    self.G_location = tf.constant_initializer(30.)
+    def __init__(self):
+        super(MyModel, self).__init__()
+        self.G_scale = tf.constant_initializer(10.)
+        self.G_location = tf.constant_initializer(30.)
 
-    self.dense1 = Dense(z_dim, h_dim_g)
-    self.dense2 = Dense(h_dim_g, h_dim_g)
-    self.dense3 = Dense(h_dim_g, X_dim)
-    self.mul = Multiply()
-    self.add = Add()
+        self.dense1 = Dense(h_dim_g)
+        self.dense2 = Dense(h_dim_g)
+        self.dense3 = Dense(X_dim)
+        self.mul = Multiply()
+        self.add = Add()
 
-  def call(self, x):
-    x = self.dense1(x)
-    x = self.dense2(x)
-    x = self.dense3(x)
-    x = self.mul(x, self.G_scale)
-    x = self.add(x, self.G_location)
+    def run(self, x):
+        x = self.dense1(x)
+        x = self.dense2(x)
+        x = self.dense3(x)
+        x = self.mul(x, self.G_scale)
+        x = self.add(x, self.G_location)
+
+#Custom loss fucntion
+    def get_loss(self, x):
+        x = self.dense1(x)
+        x = self.dense2(x)
+        x = self.dense3(x)
+        x = self.mul(x, self.G_scale)
+        x = self.add(x, self.G_location)
+        return ksd_emp(x)
 
 
 ########################################################################################################################
@@ -219,99 +318,9 @@ def sample_z(m, n, std=10.):
     return s1
 
 
-def log_densities(xs):
-
-    log_den0 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[0], Sigma_inv_tf[0]),
-                                        tf.transpose(a=xs - mu_tf[0]))) / 2 - np.log(Sigma_det[0]) / 2
-    log_den1 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[1], Sigma_inv_tf[1]),
-                                        tf.transpose(a=xs - mu_tf[1]))) / 2 - np.log(Sigma_det[1]) / 2
-    log_den2 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[2], Sigma_inv_tf[2]),
-                                        tf.transpose(a=xs - mu_tf[2]))) / 2 - np.log(Sigma_det[2]) / 2
-    log_den3 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[3], Sigma_inv_tf[3]),
-                                        tf.transpose(a=xs - mu_tf[3]))) / 2 - np.log(Sigma_det[3]) / 2
-    log_den4 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[4], Sigma_inv_tf[4]),
-                                        tf.transpose(a=xs - mu_tf[4]))) / 2 - np.log(Sigma_det[4]) / 2
-    log_den5 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[5], Sigma_inv_tf[5]),
-                                        tf.transpose(a=xs - mu_tf[5]))) / 2 - np.log(Sigma_det[5]) / 2
-    log_den6 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[6], Sigma_inv_tf[6]),
-                                        tf.transpose(a=xs - mu_tf[6]))) / 2 - np.log(Sigma_det[6]) / 2
-    log_den7 = - tf.linalg.tensor_diag_part(tf.matmul(tf.matmul(xs - mu_tf[7], Sigma_inv_tf[7]),
-                                        tf.transpose(a=xs - mu_tf[7]))) / 2 - np.log(Sigma_det[7]) / 2
-    ld = tf.expand_dims(tf.reduce_logsumexp(input_tensor=tf.stack([np.log(p[0]) + log_den0, np.log(p[1]) + log_den1,
-                                                      np.log(p[2]) + log_den2, np.log(p[3]) + log_den3,
-                                                      np.log(p[4]) + log_den4, np.log(p[5]) + log_den5,
-                                                      np.log(p[6]) + log_den6, np.log(p[7]) + log_den7], 0), axis=0), 1)
-    return ld
-
-
-def S_q(xs):
-    return tf.gradients(ys=log_densities(xs), xs=xs)[0]
-
-
-
-def rbf_kernel(x, dim=X_dim, h=1.):
-    # Reference 1: https://github.com/ChunyuanLI/SVGD/blob/master/demo_svgd.ipynb
-    # Reference 2: https://github.com/yc14600/svgd/blob/master/svgd.py
-    XY = tf.matmul(x, tf.transpose(a=x))
-    X2_ = tf.reshape(tf.reduce_sum(input_tensor=tf.square(x), axis=1), shape=[tf.shape(input=x)[0], 1])
-    X2 = tf.tile(X2_, [1, tf.shape(input=x)[0]])
-    pdist = tf.subtract(tf.add(X2, tf.transpose(a=X2)), 2 * XY)  # pairwise distance matrix
-
-    kxy = tf.exp(- pdist / h ** 2 / 2.0)  # kernel matrix
-
-    sum_kxy = tf.expand_dims(tf.reduce_sum(input_tensor=kxy, axis=1), 1)
-    dxkxy = tf.add(-tf.matmul(kxy, x), tf.multiply(x, sum_kxy)) / (h ** 2)  # sum_y dk(x, y)/dx
-
-    dxykxy_tr = tf.multiply((dim * (h**2) - pdist), kxy) / (h**4)  # tr( dk(x, y)/dxdy )
-
-    return kxy, dxkxy, dxykxy_tr
-
-
-def imq_kernel(x, dim=X_dim, beta=-.5, c=1.):
-    # IMQ kernel
-    XY = tf.matmul(x, tf.transpose(a=x))
-    X2_ = tf.reshape(tf.reduce_sum(input_tensor=tf.square(x), axis=1), shape=[tf.shape(input=x)[0], 1])
-    X2 = tf.tile(X2_, [1, tf.shape(input=x)[0]])
-    pdist = tf.subtract(tf.add(X2, tf.transpose(a=X2)), 2 * XY)  # pairwise distance matrix
-
-    kxy = (c + pdist) ** beta
-
-    coeff = 2 * beta * (c + pdist) ** (beta-1)
-    dxkxy = tf.matmul(coeff, x) - tf.multiply(x, tf.expand_dims(tf.reduce_sum(input_tensor=coeff, axis=1), 1))
-
-    dxykxy_tr = tf.multiply((c + pdist) ** (beta - 2),
-                            - 2 * dim * c * beta + (- 4 * beta ** 2 + (4 - 2 * dim) * beta) * pdist)
-
-    return kxy, dxkxy, dxykxy_tr
-
-
-kernels = {"rbf": rbf_kernel,
-           "imq": imq_kernel}
-
-Kernel = kernels[kernel]
-
-
-def ksd_emp(x, dim=X_dim):
-    sq = S_q(x)
-    kxy, dxkxy, dxykxy_tr = Kernel(x, dim)
-    t13 = tf.multiply(tf.matmul(sq, tf.transpose(a=sq)), kxy) + dxykxy_tr
-    t2 = 2 * tf.linalg.trace(tf.matmul(sq, tf.transpose(a=dxkxy)))
-    n = tf.cast(tf.shape(input=x)[0], tf.float32)
-
-    # ksd = (tf.reduce_sum(t13) - tf.trace(t13) + t2) / (n * (n-1))
-    ksd = (tf.reduce_sum(input_tensor=t13) + t2) / (n ** 2)
-
-    return ksd
 
 model = KSDmodel()
 
-loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-
-train_loss = tf.keras.metrics.Mean(name='train_loss')
-train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='train_accuracy')
-
-test_loss = tf.keras.metrics.Mean(name='test_loss')
-test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='test_accuracy')
 #######################################################################################################################
 
 losses = np.zeros(n_iter)
