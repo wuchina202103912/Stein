@@ -290,19 +290,12 @@ class KSDmodel:
 
         self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=lr)
 
-        self.G_scale = tf.convert_to_tensor(np.ones(shape = (1, X_dim)))
-        self.G_location = tf.convert_to_tensor(np.ones(shape = (1, X_dim)))
+        self.G_scale = tf.Variable(np.ones(X_dim) * 10, dtype = 'float32')
+        self.G_location = tf.Variable(np.ones(X_dim) * 30, dtype = 'float32')
 
         self.dense1 = Dense(h_dim_g)
         self.dense2 = Dense(h_dim_g)
         self.dense3 = Dense(X_dim)
-
-        self.denseG_scale = Dense(X_dim,
-            kernel_initializer=initializers.Constant(10.),
-            bias_initializer=initializers.Zeros())
-        self.denseG_location = Dense(X_dim,
-            kernel_initializer=initializers.Constant(30.),
-            bias_initializer=initializers.Zeros())
 
         self.mul = Multiply()
         self.add = Add()
@@ -311,9 +304,8 @@ class KSDmodel:
         x = self.dense1(x)
         x = self.dense2(x)
         x = self.dense3(x)
-        x = x * self.denseG_scale(self.G_scale) + self.denseG_location(self.G_location)
-        #x = self.mul([x, tf.repeat(self.denseG_scale(self.G_scale), x.shape[0] ,axis = 0)])
-        #x = self.add([x, tf.repeat(self.denseG_location(self.G_location), x.shape[0] ,axis = 0)])
+        x = self.mul([x , tf.reshape(tf.repeat(self.G_scale, x.shape[0], axis = 0), shape = x.shape)])
+        x = self.add([x, tf.reshape(tf.repeat(self.G_location, x.shape[0], axis = 0), shape = x.shape)])
         return x.numpy()
 
 #Custom loss fucntion
@@ -321,9 +313,8 @@ class KSDmodel:
         x = self.dense1(x)
         x = self.dense2(x)
         x = self.dense3(x)
-        x = x * self.denseG_scale(self.G_scale) + self.denseG_location(self.G_location)
-        #x = self.mul([x, tf.repeat(self.denseG_scale(self.G_scale), x.shape[0] ,axis = 0)])
-        #x = self.add([x, tf.repeat(self.denseG_location(self.G_location), x.shape[0] ,axis = 0)])
+        x = self.mul([x , tf.reshape(tf.repeat(self.G_scale, x.shape[0], axis = 0), shape = x.shape)])
+        x = self.add([x, tf.reshape(tf.repeat(self.G_location, x.shape[0], axis = 0), shape = x.shape)])
         return ksd_emp(x)
 
     # get gradients
@@ -332,13 +323,13 @@ class KSDmodel:
             tape.watch(self.dense1.variables)
             tape.watch(self.dense2.variables)
             tape.watch(self.dense3.variables)
-            tape.watch(self.denseG_scale.variables)
-            tape.watch(self.denseG_location.variables)
+            tape.watch(self.G_scale)
+            tape.watch(self.G_location)
 
             L = self.get_loss(x)
             g = tape.gradient(L, [
-                self.denseG_scale.variables[0],self.denseG_scale.variables[1],
-                self.denseG_location.variables[0],self.denseG_location.variables[1],
+                self.G_scale,
+                self.G_location,
                 self.dense1.variables[0],self.dense1.variables[1],
                 self.dense2.variables[0],self.dense2.variables[1],
                 self.dense3.variables[0],self.dense3.variables[1]])
@@ -348,8 +339,8 @@ class KSDmodel:
     def network_learn(self,x):
         g, L = self.get_grad(x)
         self.optimizer.apply_gradients(zip(g, [
-            self.denseG_scale.variables[0],self.denseG_scale.variables[1],
-            self.denseG_location.variables[0],self.denseG_location.variables[1],
+            self.G_scale,
+            self.G_location,
             self.dense1.variables[0],self.dense1.variables[1],
             self.dense2.variables[0],self.dense2.variables[1],
             self.dense3.variables[0],self.dense3.variables[1]]))
@@ -368,12 +359,6 @@ def sample_z(m, n, std=10.):
 
 model = KSDmodel()
 
-train_loss = tf.keras.metrics.Mean(name='train_loss')
-train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='train_accuracy')
-
-test_loss = tf.keras.metrics.Mean(name='test_loss')
-test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='test_accuracy')
-
 #######################################################################################################################
 
 losses = np.zeros(n_iter)
@@ -389,6 +374,7 @@ for it in range(n_iter):
     losses[it] = loss_curr
 
     if it % iter_display == 0:
+        print(model.G_scale)
         samples = model.run(sample)
         mmd_curr = mmd_eval(samples)
         mmds[it // iter_display] = mmd_curr
