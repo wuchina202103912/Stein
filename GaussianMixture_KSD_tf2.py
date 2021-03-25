@@ -10,7 +10,7 @@ Created on 10/7/18 8:40 PM
 
 import tensorflow as tf
 from tensorflow.keras.layers import *
-from tensorflow.keras import Model
+#from tensorflow.keras import Model
 from tensorflow.keras import initializers
 import numpy as np
 from scipy.stats import multivariate_normal
@@ -60,7 +60,7 @@ def mmd_eval(x, y=true_sample):
 ########################################################################################################################
 # model parameters
 
-lr = 2e-4  # learning rate
+lr = 2e-5  # learning rate
 h_dim_g = 200  # number of hidden neurons per layer of the generator
 z_dim = 5  # noise dimension
 
@@ -288,14 +288,16 @@ class KSDmodel:
     
     def __init__(self):
 
+        self.initializer = tf.keras.initializers.GlorotNormal()
+
         self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=lr)
 
         self.G_scale = tf.Variable(np.ones(X_dim) * 10, dtype = 'float32')
         self.G_location = tf.Variable(np.ones(X_dim) * 30, dtype = 'float32')
 
-        self.dense1 = Dense(h_dim_g)
-        self.dense2 = Dense(h_dim_g)
-        self.dense3 = Dense(X_dim)
+        self.dense1 = Dense(h_dim_g, kernel_initializer=self.initializer, bias_initializer=self.initializer)
+        self.dense2 = Dense(h_dim_g, kernel_initializer=self.initializer, bias_initializer=self.initializer)
+        self.dense3 = Dense(X_dim, kernel_initializer=self.initializer, bias_initializer=self.initializer)
 
         self.mul = Multiply()
         self.add = Add()
@@ -304,7 +306,7 @@ class KSDmodel:
         x = self.dense1(x)
         x = self.dense2(x)
         x = self.dense3(x)
-        x = self.mul([x , tf.reshape(tf.repeat(self.G_scale, x.shape[0], axis = 0), shape = x.shape)])
+        x = self.mul([x, tf.reshape(tf.repeat(self.G_scale, x.shape[0], axis = 0), shape = x.shape)])
         x = self.add([x, tf.reshape(tf.repeat(self.G_location, x.shape[0], axis = 0), shape = x.shape)])
         return x.numpy()
 
@@ -313,7 +315,7 @@ class KSDmodel:
         x = self.dense1(x)
         x = self.dense2(x)
         x = self.dense3(x)
-        x = self.mul([x , tf.reshape(tf.repeat(self.G_scale, x.shape[0], axis = 0), shape = x.shape)])
+        x = self.mul([x, tf.reshape(tf.repeat(self.G_scale, x.shape[0], axis = 0), shape = x.shape)])
         x = self.add([x, tf.reshape(tf.repeat(self.G_location, x.shape[0], axis = 0), shape = x.shape)])
         return ksd_emp(x)
 
@@ -374,7 +376,7 @@ for it in range(n_iter):
     losses[it] = loss_curr
 
     if it % iter_display == 0:
-        print(model.G_scale)
+        print(model.G_location)
         samples = model.run(sample)
         mmd_curr = mmd_eval(samples)
         mmds[it // iter_display] = mmd_curr

@@ -242,13 +242,6 @@ def log_densities(xs):
 def S_q(xs):
     return tf.gradients(ys=log_densities(xs), xs=xs)[0]
 
-model = tf.keras.models.Sequential([
-tf.keras.layers.Dense(h_dim_g, activation='relu'),
-tf.keras.layers.Dense(X_dim, activation='relu'),
-tf.keras.layers.Lambda(lambda x: x * G_scale),
-tf.keras.layers.Lambda(lambda x: x + G_location)
-])
-
 def generator(z):
     return model(z)
 
@@ -306,6 +299,13 @@ def ksd_emp(x, dim=X_dim):
     ksd = (tf.reduce_sum(input_tensor=t13) + t2) / (n ** 2)
 
     return ksd
+
+model = tf.keras.models.Sequential([
+    tf.keras.layers.Dense(h_dim_g, activation='relu'),
+    tf.keras.layers.Dense(X_dim, activation='relu'),
+    tf.keras.layers.Lambda(lambda x: x * G_scale),
+    tf.keras.layers.Lambda(lambda x: x + G_location)
+])
 
 
 G_sample = generator(z)
