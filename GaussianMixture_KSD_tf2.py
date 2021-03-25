@@ -10,7 +10,8 @@ Created on 10/7/18 8:40 PM
 
 import tensorflow as tf
 from tensorflow.keras.layers import *
-tf.compat.v1.disable_eager_execution()
+from tensorflow.keras import Model
+#tf.compat.v1.disable_eager_execution()
 import numpy as np
 from scipy.stats import multivariate_normal
 import math
@@ -116,7 +117,11 @@ def log_densities(xs):
 
 
 def S_q(xs):
-    return tf.gradients(ys=log_densities(xs), xs=xs)[0]
+    with tf.GradientTape() as g:
+        g.watch(xs)
+        ys=log_densities(xs)
+    #print(g.gradient(ys, [xs]))
+    return g.gradient(ys, [xs])[0]
 
 
 
@@ -285,12 +290,16 @@ class KSDmodel:
 
         self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=lr)
 
-        self.G_scale = tf.Variable(10 * np.ones(shape = (1, X_dim)))
-        self.G_location = tf.Variable(30 * np.ones(shape = (1, X_dim)))
+        self.G_scale = tf.convert_to_tensor(10 * np.ones(shape = (1, X_dim)))
+        self.G_location = tf.convert_to_tensor(30 * np.ones(shape = (1, X_dim)))
 
         self.dense1 = Dense(h_dim_g)
         self.dense2 = Dense(h_dim_g)
         self.dense3 = Dense(X_dim)
+
+        self.denseG_scale = Dense(X_dim)
+        self.denseG_location = Dense(X_dim)
+
         self.mul = Multiply()
         self.add = Add()
 
@@ -298,16 +307,19 @@ class KSDmodel:
         x = self.dense1(x)
         x = self.dense2(x)
         x = self.dense3(x)
-        x = self.mul([x, tf.repeat(self.G_scale, x.shape[0])])
-        x = self.add([x, self.G_location])
+        #x = x * self.denseG_scale(self.G_scale) + self.G_location
+        x = self.mul([x, tf.repeat(self.denseG_scale(self.G_scale), x.shape[0] ,axis = 0)])
+        x = self.add([x, tf.repeat(self.denseG_location(self.G_location), x.shape[0] ,axis = 0)])
+        return x
 
 #Custom loss fucntion
     def get_loss(self, x):
         x = self.dense1(x)
         x = self.dense2(x)
         x = self.dense3(x)
-        x = self.mul([x, tf.repeat(self.G_scale, x.shape[0], axis = 0)])
-        x = self.add([x, tf.repeat(self.G_location, x.shape[0], axis = 0)])
+        #x = x * self.G_scale + self.G_location
+        x = self.mul([x, tf.repeat(self.denseG_scale(self.G_scale), x.shape[0] ,axis = 0)])
+        x = self.add([x, tf.repeat(self.denseG_location(self.G_location), x.shape[0] ,axis = 0)])
         return ksd_emp(x)
 
     # get gradients
@@ -316,15 +328,17 @@ class KSDmodel:
             tape.watch(self.dense1.variables)
             tape.watch(self.dense2.variables)
             tape.watch(self.dense3.variables)
-            tape.watch(self.G_scale)
-            tape.watch(self.G_location)
+            tape.watch(self.denseG_scale.variables)
+            tape.watch(self.denseG_location.variables)
 
             L = self.get_loss(x)
-            g = tape.gradient(L, [self.G_scale[0],
-                self.G_location[0],
+            g = tape.gradient(L, [
+                self.denseG_scale.variables[0],self.denseG_scale.variables[1],
+                self.denseG_location.variables[0],self.denseG_location.variables[1],
                 self.dense1.variables[0],self.dense1.variables[1],
                 self.dense2.variables[0],self.dense2.variables[1],
                 self.dense3.variables[0],self.dense3.variables[1]])
+            print(g[0])
         return g
 
    # perform gradient descent
@@ -336,6 +350,8 @@ class KSDmodel:
             self.dense1.variables[0],self.dense1.variables[1],
             self.dense2.variables[0],self.dense2.variables[1],
             self.dense3.variables[0],self.dense3.variables[1]]))
+            
+
 
 ########################################################################################################################
 # functions & structures
@@ -348,10 +364,12 @@ def sample_z(m, n, std=10.):
 
 
 model = KSDmodel()
-initialpoints = sample_z(mb_size, z_dim)
 
-for i in range(100):
-    model.network_learn(initialpoints)
+train_loss = tf.keras.metrics.Mean(name='train_loss')
+train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='train_accuracy')
+
+test_loss = tf.keras.metrics.Mean(name='test_loss')
+test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='test_accuracy')
 
 #######################################################################################################################
 
@@ -360,12 +378,12 @@ mmds = np.zeros(1 + (n_iter // iter_display))
 
 for it in range(n_iter):
 
-    _, loss_curr = sess.run([solver_KSD, ksd],
-                            feed_dict={z: sample_z(mb_size, z_dim)})
-    losses[it] = loss_curr
+    sample = sample_z(mb_size, z_dim)
+    model.network_learn(sample)
+    #losses[it] = tf.reduce_sum(model.get_loss(sample))
 
     if it % iter_display == 0:
-        samples = sess.run(G_sample, feed_dict={z: sample_z(show_size, z_dim)})
+        samples = model.run(sample)
         mmd_curr = mmd_eval(samples)
         mmds[it // iter_display] = mmd_curr
         show_plot(samples, "KSD", it=it, loss=loss_curr, mmd=mmd_curr, fname=None, title=True, fix_window=True)
