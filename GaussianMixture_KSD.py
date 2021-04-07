@@ -208,6 +208,7 @@ theta_G = [G_W1, G_b1, G_W2, G_b2, G_W3, G_b3, G_scale, G_location]
 # functions & structures
 
 def sample_z(m, n, std=10.):
+    np.random.seed(1)
     s1 = np.random.normal(0, std, size=[m, n])
     # s1 = np.random.uniform(-sd, sd, size=[m, n])
     return s1
@@ -326,6 +327,7 @@ for it in range(n_iter):
     losses[it] = loss_curr
 
     if it % iter_display == 0:
+        print(G_location)
         samples = sess.run(G_sample, feed_dict={z: sample_z(show_size, z_dim)})
         mmd_curr = mmd_eval(samples)
         mmds[it // iter_display] = mmd_curr

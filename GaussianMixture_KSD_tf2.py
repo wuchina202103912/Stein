@@ -60,7 +60,7 @@ def mmd_eval(x, y=true_sample):
 ########################################################################################################################
 # model parameters
 
-lr = 2e-5  # learning rate
+lr = 2e-2  # learning rate
 h_dim_g = 200  # number of hidden neurons per layer of the generator
 z_dim = 5  # noise dimension
 
@@ -290,7 +290,7 @@ class KSDmodel:
 
         self.initializer = tf.keras.initializers.GlorotNormal()
 
-        self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=lr)
+        self.optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
 
         self.G_scale = tf.Variable(np.ones(X_dim) * 10, dtype = 'float32')
         self.G_location = tf.Variable(np.ones(X_dim) * 30, dtype = 'float32')
@@ -304,7 +304,9 @@ class KSDmodel:
 
     def run(self, x):
         x = self.dense1(x)
+        x = tf.keras.activations.tanh(x)
         x = self.dense2(x)
+        x = tf.keras.activations.tanh(x)
         x = self.dense3(x)
         x = self.mul([x, tf.reshape(tf.repeat(self.G_scale, x.shape[0], axis = 0), shape = x.shape)])
         x = self.add([x, tf.reshape(tf.repeat(self.G_location, x.shape[0], axis = 0), shape = x.shape)])
@@ -313,7 +315,9 @@ class KSDmodel:
 #Custom loss fucntion
     def get_loss(self, x):
         x = self.dense1(x)
+        x = tf.keras.activations.tanh(x)
         x = self.dense2(x)
+        x = tf.keras.activations.tanh(x)
         x = self.dense3(x)
         x = self.mul([x, tf.reshape(tf.repeat(self.G_scale, x.shape[0], axis = 0), shape = x.shape)])
         x = self.add([x, tf.reshape(tf.repeat(self.G_location, x.shape[0], axis = 0), shape = x.shape)])
@@ -352,8 +356,9 @@ class KSDmodel:
 
 ########################################################################################################################
 # functions & structures
+np.random.seed(1)
 
-def sample_z(m, n, std=10.):
+def sample_z(m, n, std=1.):
     s1 = np.random.normal(0, std, size=[m, n])
     # s1 = np.random.uniform(-sd, sd, size=[m, n])
     return s1
@@ -368,6 +373,7 @@ mmds = np.zeros(1 + (n_iter // iter_display))
 
 for it in range(n_iter):
     print(it)
+    print(model.G_location)
 
     sample = sample_z(mb_size, z_dim)
     L = model.network_learn(sample)
@@ -375,8 +381,12 @@ for it in range(n_iter):
     loss_curr = L
     losses[it] = loss_curr
 
+
+#    if it % 1000 == 0 and it != 0:
+#        lr = lr / 10
+#        model.optimizer = tf.keras.optimizers.SGD(learning_rate=lr)
+
     if it % iter_display == 0:
-        print(model.G_location)
         samples = model.run(sample)
         mmd_curr = mmd_eval(samples)
         mmds[it // iter_display] = mmd_curr
